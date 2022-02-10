@@ -1,0 +1,29 @@
+variables:
+- name: BuildParameters.solution
+  value: sample.sln
+- name: BuildPlatform
+  value: any cpu
+- name: BuildConfiguration
+  value: Release
+name: $(date:yyyyMMdd)$(rev:.r)
+jobs:
+- job: Job_1
+  displayName: Agent job 1
+  pool:
+    vmImage: windows-2019
+  steps:
+  - checkout: self
+  - task: PowerShell@2
+    displayName: Install Biztalk update
+    inputs:
+      targetType: inline
+      script: "          $bizTalkBuildComponentUri = \"https://aka.ms/BuildComponentSetup.EN\"\n          $setupZipFile = Start-DownloadWithRetry -Url $bizTalkBuildComponentUri -Name \"BuildComponentSetup.EN.zip\"\n          $setupPath = \"C:\\BizTalkBuildComponent\"\n          if (-not (Test-Path -Path $setupPath)) {\n              $null = New-Item -Path $setupPath -ItemType Directory -Force\n          }\n          Extract-7Zip -Path $setupZipFile -DestinationPath $setupPath\n          Start-Process msiexec.exe -ArgumentList \"/qn /x C:\\BizTalkBuildComponent\\Bootstrap.msi\" -Wait\n          Start-Process msiexec.exe -ArgumentList \"/qn /x C:\\BizTalkBuildComponent\\BuildComponentSetup.msi\" -Wait\n          $bizTalkBuildComponentUri = \"https://aka.ms/TestBuildComponentSetup.EN.zip\"\n          $setupZipFile = Start-DownloadWithRetry -Url $bizTalkBuildComponentUri -Name \"BuildComponentSetup.EN.zip\"\n          Extract-7Zip -Path $setupZipFile -DestinationPath $setupPath\n          $ArgumentList = ('/i', \"C:\\BizTalkBuildComponent\\BuildComponentSetup.EN\\Bootstrap.msi\", '/QN', '/norestart')\n          Start-Process -FilePath msiexec.exe -ArgumentList $ArgumentList -Wait\n          $ArgumentList = ('/i', \"C:\\BizTalkBuildComponent\\BuildComponentSetup.EN\\BuildComponentSetup.msi\", '/QN', '/norestart')\n          Start-Process -FilePath msiexec.exe -ArgumentList $ArgumentList -Wait \n          \n          $bizTalkReg = Get-ItemProperty \"HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\BizTalk Server\\3.0\"\n          return \"$($bizTalkReg.ProductName) $($bizTalkReg.ProductVersion)\""
+  - task: VSBuild@1
+    displayName: Build solution sample.sln
+    inputs:
+      solution: $(BuildParameters.solution)
+      vsVersion: 16.0
+      platform: $(BuildPlatform)
+      configuration: $(BuildConfiguration)
+      maximumCpuCount: true
+...
